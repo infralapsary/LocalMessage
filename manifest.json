@@ -1,0 +1,7 @@
+{
+  "name": "LocalDMTroll",
+  "description": "Client-side fake messages from the other person in DMs. Nothing is sent.",
+  "authors": [{ "name": "you", "id": "0" }],
+  "main": "index.js",
+  "vendetta": { "icon": "ic_message" }
+}
