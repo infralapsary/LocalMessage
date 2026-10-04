@@ -1,7 +1,7 @@
-import { ChatBarButton, type ChatBarButtonFactory } from "@api/ChatButtons";
+import { ChatBarButton } from "@api/ChatButtons";
 import { DataStore } from "@api/index";
 import { Devs } from "@utils/constants";
-import { ModalContent, ModalFooter, ModalHeader, ModalProps, ModalRoot, openModal } from "@utils/modal";
+import { ModalContent, ModalFooter, ModalHeader, ModalRoot, openModal } from "@utils/modal";
 import definePlugin from "@utils/types";
 import {
     Button,
@@ -20,16 +20,7 @@ import {
 
 const STORE_KEY = "LocalDMTroll_v1";
 
-type SavedMsg = {
-    id: string;
-    channel_id: string;
-    author: any;
-    content: string;
-    timestamp: string;
-    attachments: any[];
-};
-
-let cache: Record<string, SavedMsg[]> = {};
+let cache = {};
 
 async function loadStore() {
     const data = await DataStore.get(STORE_KEY);
@@ -40,19 +31,19 @@ async function saveStore() {
     await DataStore.set(STORE_KEY, cache);
 }
 
-function isDM(id: string) {
+function isDM(id) {
     const ch = ChannelStore.getChannel(id);
     return !!ch && (ch.type === 1 || ch.type === 3);
 }
 
-function getThem(channelId: string) {
+function getThem(channelId) {
     const ch = ChannelStore.getChannel(channelId);
     if (!ch) return null;
-    const rid = (ch as any).recipients?.[0] ?? (ch as any).recipientId;
+    const rid = ch.recipients?.[0] ?? ch.recipientId;
     return rid ? UserStore.getUser(rid) : null;
 }
 
-function dispatchMsg(msg: SavedMsg) {
+function dispatchMsg(msg) {
     FluxDispatcher.dispatch({
         type: "MESSAGE_CREATE",
         channelId: msg.channel_id,
@@ -75,7 +66,7 @@ function dispatchMsg(msg: SavedMsg) {
     });
 }
 
-function inject(channelId: string, content: string, imageDataUrl?: string | null, imageName?: string) {
+function inject(channelId, content, imageDataUrl, imageName) {
     const them = getThem(channelId);
     if (!them) {
         showToast("Could not resolve user", Toasts.Type.FAILURE);
@@ -83,7 +74,7 @@ function inject(channelId: string, content: string, imageDataUrl?: string | null
     }
 
     const id = SnowflakeUtils.fromTimestamp(Date.now());
-    const attachments: any[] = [];
+    const attachments = [];
 
     if (imageDataUrl) {
         attachments.push({
@@ -99,7 +90,7 @@ function inject(channelId: string, content: string, imageDataUrl?: string | null
         });
     }
 
-    const saved: SavedMsg = {
+    const saved = {
         id,
         channel_id: channelId,
         author: {
@@ -108,8 +99,8 @@ function inject(channelId: string, content: string, imageDataUrl?: string | null
             discriminator: them.discriminator ?? "0",
             avatar: them.avatar,
             bot: false,
-            global_name: (them as any).globalName ?? them.username,
-            public_flags: (them as any).publicFlags ?? 0,
+            global_name: them.globalName ?? them.username,
+            public_flags: them.publicFlags ?? 0,
         },
         content: content || "",
         timestamp: new Date().toISOString(),
@@ -124,7 +115,7 @@ function inject(channelId: string, content: string, imageDataUrl?: string | null
     showToast(`from ${them.username}`, Toasts.Type.SUCCESS);
 }
 
-function restoreChannel(channelId: string) {
+function restoreChannel(channelId) {
     const list = cache[channelId];
     if (!list?.length) return;
     // small delay so Discord finishes loading the channel first
@@ -133,14 +124,14 @@ function restoreChannel(channelId: string) {
     }, 400);
 }
 
-function TrollModal({ rootProps, channelId, close }: { rootProps: ModalProps; channelId: string; close: () => void; }) {
+function TrollModal({ rootProps, channelId, close }) {
     const [text, setText] = useState("");
-    const [image, setImage] = useState<string | null>(null);
+    const [image, setImage] = useState(null);
     const [imageName, setImageName] = useState("");
-    const fileRef = useRef<HTMLInputElement>(null);
+    const fileRef = useRef(null);
     const them = getThem(channelId);
 
-    const onFile = (e: any) => {
+    const onFile = (e) => {
         const file = e.target.files?.[0];
         if (!file || !file.type.startsWith("image/")) {
             showToast("Only images", Toasts.Type.FAILURE);
@@ -148,7 +139,7 @@ function TrollModal({ rootProps, channelId, close }: { rootProps: ModalProps; ch
         }
         const reader = new FileReader();
         reader.onload = () => {
-            setImage(reader.result as string);
+            setImage(reader.result);
             setImageName(file.name);
         };
         reader.readAsDataURL(file);
@@ -188,7 +179,7 @@ function TrollModal({ rootProps, channelId, close }: { rootProps: ModalProps; ch
                         value={text}
                         onChange={setText}
                         placeholder="What would they say..."
-                        onKeyDown={(e: any) => {
+                        onKeyDown={(e) => {
                             if (e.key === "Enter" && !e.shiftKey) {
                                 e.preventDefault();
                                 send();
@@ -230,7 +221,7 @@ function TrollModal({ rootProps, channelId, close }: { rootProps: ModalProps; ch
     );
 }
 
-const TrollButton: ChatBarButtonFactory = props => {
+const TrollButton = props => {
     if (!props.isAnyChat) return null;
     const channelId = SelectedChannelStore.getChannelId();
     if (!channelId || !isDM(channelId)) return null;
@@ -258,7 +249,7 @@ export default definePlugin({
     dependencies: ["ChatInputButtonAPI"],
 
     chatBarButton: {
-        icon: () => null as any,
+        icon: () => null,
         render: TrollButton,
     },
 
@@ -266,7 +257,7 @@ export default definePlugin({
         await loadStore();
 
         // restore when you open a DM
-        FluxDispatcher.subscribe("CHANNEL_SELECT", ({ channelId }: any) => {
+        FluxDispatcher.subscribe("CHANNEL_SELECT", ({ channelId }) => {
             if (channelId && isDM(channelId)) restoreChannel(channelId);
         });
 
